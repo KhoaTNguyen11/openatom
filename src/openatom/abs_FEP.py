@@ -334,6 +334,44 @@ def _make_custom_forces(lig: ET.Element, lambdas: Tuple[float, float], env: ET.E
     return force
 
 
+def _merge_forces(lig, lambdas, env):
+    forces = ET.Element("Forces")
+
+    # add the bonded forces, which should be a default setting in absolute hydration free energy calculation
+    force = _merge_harmonic_bond_forces(lig, env)
+    forces.append(force)
+
+    # add angle forces, which should be a default setting in absolute hydration free energy calculation
+    force = _merge_harmonic_angle_forces(lig, env)
+    forces.append(force)
+
+    # add torsion forces, which should be a default setting in absolute hydration free energy calculation
+    force = _merge_periodic_torsion_forces(lig, env)
+    forces.append(force)
+
+    # add nonbonded forces, here we turn off the vdw interaction between ligand and solvent, and only consider the coulombic interaction by scaling the charge of the ligand
+    force = _merge_nonbonded_forces(lig, lambdas, env)
+    forces.append(force)
+
+    # compute the vdw interaction in the ligand, which is set as standard Lennard-Jones particle by custom bond forces
+    force = _make_ligand_vdw_forces(lig)
+    forces.append(force)
+
+    # in non_bonded_forces, we scaled the charge of the ligand, so we need to add force change back to the ligand
+    force = _make_ligand_coul_forces(lig, lambdas)
+    forces.append(force)
+
+    # add custom forces, the interaction between ligand and solvent is set as soft-core Lennard-Jones particle
+    # and should be considered changing the interaction between ligand and solvent in FEP calculation
+    force = _make_custom_forces(lig, lambdas, env)
+    forces.append(force)
+
+    # make cmmotion forces, which is to make sure the center of mass of the ligand is fixed
+    force = _make_cmmotion_remover()
+    forces.append(force)
+
+    return forces
+    
 
 def make_abs_alchemy_system(
     lig: ET.Element,
